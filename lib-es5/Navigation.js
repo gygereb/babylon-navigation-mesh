@@ -165,8 +165,21 @@ var Navigation = Class.$extend({
 
     return proj;
   },
-
-  findPath: function findPath(startPosition, targetPosition, zone, group) {
+  findNodeClosestToPosition: function findNodeClosestToPosition(nodes, needle) {
+    var distance = Infinity;
+    var closestNode = null;
+    nodes.forEach(function (node) {
+      var measuredDistance = BABYLON.Vector3.DistanceSquared(node.centroid, needle);
+      if (measuredDistance < distance) {
+        closestNode = node;
+        distance = measuredDistance;
+      }
+    });
+    return closestNode;
+  },
+  findPath: function findPath(startPosition, targetPosition, zone, group, obstacleFlag, nodeChannelCollector) {
+    //a bit bloated method...
+    // should check if obstacleMask on start and end node are OK
 
     var allNodes = this.zoneNodes[zone].groups[group];
     var vertices = this.zoneNodes[zone].vertices;
@@ -198,7 +211,9 @@ var Navigation = Class.$extend({
       return null;
     }
 
-    var paths = this.astar.search(allNodes, closestNode, farthestNode);
+    var paths = this.astar.search(allNodes, closestNode, farthestNode, obstacleFlag, nodeChannelCollector);
+    //console.log("RAW PATH");
+    //console.log(paths);
 
     var getPortalFromTo = function getPortalFromTo(a, b) {
       for (var i = 0; i < a.neighbours.length; i++) {
@@ -956,6 +971,7 @@ var Navigation = Class.$extend({
 
         newGroup.push({
           id: findPolygonIndex(group, p),
+          obstacleMask: 0,
           neighbours: neighbours,
           vertexIds: p.vertexIds,
           centroid: p.centroid,

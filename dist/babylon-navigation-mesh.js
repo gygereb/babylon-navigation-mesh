@@ -5,6 +5,7 @@ var Class = require("abitbol");
 var BinaryHeap = require("./BinaryHeap.js");
 
 var Astar = Class.$extend({
+	currentObstacleFlag: null,
 
 	init: function init(graph) {
 		for (var x = 0; x < graph.length; x++) {
@@ -39,10 +40,11 @@ var Astar = Class.$extend({
 		});
 	},
 
-	search: function search(graph, start, end) {
+	search: function search(graph, start, end, obstacleFlag, nodeChannelCollector) {
 		this.init(graph);
+		this.currentObstacleFlag = obstacleFlag;
 		//heuristic = heuristic || astar.manhattan;
-
+		//may check start and end items here if obsFlag is not null...
 
 		var openHeap = this.heap();
 
@@ -56,7 +58,8 @@ var Astar = Class.$extend({
 			// End case -- result has been found, return the traced path.
 			if (currentNode === end) {
 				var curr = currentNode;
-				var ret = [];
+				var ret = typeof nodeChannelCollector === 'undefined' || nodeChannelCollector === null ? [] : nodeChannelCollector;
+
 				while (curr.parent) {
 					ret.push(curr);
 					curr = curr.parent;
@@ -106,6 +109,7 @@ var Astar = Class.$extend({
 		}
 
 		// No result was found - empty array signifies failure to find path.
+		// null should be more appropriate imho :)
 		return [];
 	},
 	heuristic: function heuristic(pos1, pos2) {
@@ -115,7 +119,10 @@ var Astar = Class.$extend({
 		var ret = [];
 
 		for (var e = 0; e < node.neighbours.length; e++) {
-			ret.push(graph[node.neighbours[e]]);
+			var neighbour = graph[node.neighbours[e]];
+			if (this.currentObstacleFlag === null || (neighbour.obstacleMask & this.currentObstacleFlag) === 0) {
+				ret.push(neighbour);
+			}
 		}
 
 		return ret;
@@ -529,8 +536,21 @@ var Navigation = Class.$extend({
 
     return proj;
   },
-
-  findPath: function findPath(startPosition, targetPosition, zone, group) {
+  findNodeClosestToPosition: function findNodeClosestToPosition(nodes, needle) {
+    var distance = Infinity;
+    var closestNode = null;
+    nodes.forEach(function (node) {
+      var measuredDistance = BABYLON.Vector3.DistanceSquared(node.centroid, needle);
+      if (measuredDistance < distance) {
+        closestNode = node;
+        distance = measuredDistance;
+      }
+    });
+    return closestNode;
+  },
+  findPath: function findPath(startPosition, targetPosition, zone, group, obstacleFlag, nodeChannelCollector) {
+    //a bit bloated method...
+    // should check if obstacleMask on start and end node are OK
 
     var allNodes = this.zoneNodes[zone].groups[group];
     var vertices = this.zoneNodes[zone].vertices;
@@ -562,7 +582,9 @@ var Navigation = Class.$extend({
       return null;
     }
 
-    var paths = this.astar.search(allNodes, closestNode, farthestNode);
+    var paths = this.astar.search(allNodes, closestNode, farthestNode, obstacleFlag, nodeChannelCollector);
+    //console.log("RAW PATH");
+    //console.log(paths);
 
     var getPortalFromTo = function getPortalFromTo(a, b) {
       for (var i = 0; i < a.neighbours.length; i++) {
@@ -1320,6 +1342,7 @@ var Navigation = Class.$extend({
 
         newGroup.push({
           id: findPolygonIndex(group, p),
+          obstacleMask: 0,
           neighbours: neighbours,
           vertexIds: p.vertexIds,
           centroid: p.centroid,

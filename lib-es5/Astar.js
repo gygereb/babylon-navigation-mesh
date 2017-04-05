@@ -4,6 +4,7 @@ var Class = require("abitbol");
 var BinaryHeap = require("./BinaryHeap.js");
 
 var Astar = Class.$extend({
+	currentObstacleFlag: null,
 
 	init: function init(graph) {
 		for (var x = 0; x < graph.length; x++) {
@@ -38,10 +39,11 @@ var Astar = Class.$extend({
 		});
 	},
 
-	search: function search(graph, start, end) {
+	search: function search(graph, start, end, obstacleFlag, nodeChannelCollector) {
 		this.init(graph);
+		this.currentObstacleFlag = obstacleFlag;
 		//heuristic = heuristic || astar.manhattan;
-
+		//may check start and end items here if obsFlag is not null...
 
 		var openHeap = this.heap();
 
@@ -55,7 +57,8 @@ var Astar = Class.$extend({
 			// End case -- result has been found, return the traced path.
 			if (currentNode === end) {
 				var curr = currentNode;
-				var ret = [];
+				var ret = typeof nodeChannelCollector === 'undefined' || nodeChannelCollector === null ? [] : nodeChannelCollector;
+
 				while (curr.parent) {
 					ret.push(curr);
 					curr = curr.parent;
@@ -105,6 +108,7 @@ var Astar = Class.$extend({
 		}
 
 		// No result was found - empty array signifies failure to find path.
+		// null should be more appropriate imho :)
 		return [];
 	},
 	heuristic: function heuristic(pos1, pos2) {
@@ -114,7 +118,10 @@ var Astar = Class.$extend({
 		var ret = [];
 
 		for (var e = 0; e < node.neighbours.length; e++) {
-			ret.push(graph[node.neighbours[e]]);
+			var neighbour = graph[node.neighbours[e]];
+			if (this.currentObstacleFlag === null || (neighbour.obstacleMask & this.currentObstacleFlag) === 0) {
+				ret.push(neighbour);
+			}
 		}
 
 		return ret;
